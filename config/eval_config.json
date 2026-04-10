@@ -1,0 +1,25 @@
+{
+  "data_csv": "data/globem/globem_bdi_eval.csv",
+  "results_dir": "results",
+  "required_columns": [
+    "sample_id",
+    "image_path_or_url",
+    "question",
+    "gold_answer"
+  ],
+  "system_prompt_text": "You are a clinical decision support assistant specializing in behavioral health risk assessment. You will be given longitudinal behavioral data collected from mobile sensing (screen usage, sleep patterns, social proximity) for a patient, along with their Beck Depression Inventory (BDI) score at study enrollment. Your task is to predict the patient's depression severity category after the 8-week observation period. Respond with only one of the following labels: Minimal, Mild, Moderate, or Severe. Do not explain your reasoning.",
+  "generation": {
+    "max_new_tokens": 10,
+    "do_sample": false
+  },
+  "models": {
+    "gemma3":          "google/gemma-3-4b-it",
+    "medgemma15":      "google/medgemma-4b-it",
+    "gemma4_backbone": "google/gemma-4-E4B-it"
+  },
+  "_notes": {
+    "image_col": "image_path_or_url column is kept for schema compatibility but is empty; all notebooks skip image input and run text-only.",
+    "gold_answer": "This time evaluates BDI Score Categoray (4 categories from 0-63 BDI Score).",
+    "max_new_tokens": "Set to 10 because the model needs to emit a single token."
+  }
+}

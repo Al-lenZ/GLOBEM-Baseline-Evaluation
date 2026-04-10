@@ -1,0 +1,182 @@
+"""
+eval_utils.py — shared helpers for all eval notebooks.
+Place this file alongside the notebooks (in the notebooks/ directory).
+
+Supports two prediction modes:
+  - HRS  : integer in {0, -1, -2, -3}
+  - BDI  : category label in {Minimal, Mild, Moderate, Severe}
+
+The eval notebooks call extract_hrs_prediction() and compute_metrics() unchanged.
+For BDI eval CSVs, use extract_bdi_prediction() and compute_metrics() instead —
+compute_metrics() auto-detects the mode from the gold labels in the results list.
+"""
+
+import json
+import re
+from collections import Counter
+
+
+# ── Text helpers ──────────────────────────────────────────────────────────────
+
+def slugify(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    return text.strip("_")[:64]
+
+
+def normalize_text(text: str) -> str:
+    text = (text or "").lower().strip()
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"[^a-z0-9 \-]", "", text)
+    return text
+
+
+# ── Output parsing ────────────────────────────────────────────────────────────
+
+_HRS_PATTERN = re.compile(r"-?\b[0-3]\b")
+
+# BDI severity categories (case-insensitive match)
+VALID_BDI = {"Minimal", "Mild", "Moderate", "Severe"}
+_BDI_PATTERN = re.compile(r"\b(Minimal|Mild|Moderate|Severe)\b", re.IGNORECASE)
+_BDI_CANONICAL = {s.lower(): s for s in VALID_BDI}
+
+
+def extract_hrs_prediction(output_obj) -> str:
+    """
+    Pull the raw generated string out of whatever the pipeline returns,
+    then find the first integer in {0, -1, -2, -3}.
+    Returns the matched string (e.g. '-2') or '' if nothing matched.
+    """
+    raw = _raw_text(output_obj)
+    # Look for the last assistant turn if the pipeline returns the full conversation
+    if isinstance(output_obj, list):
+        for item in reversed(output_obj):
+            if isinstance(item, dict):
+                content = item.get("generated_text", "")
+                if isinstance(content, list):
+                    # chat-style: list of role/content dicts
+                    for turn in reversed(content):
+                        if isinstance(turn, dict) and turn.get("role") == "assistant":
+                            raw = _stringify_content(turn.get("content", ""))
+                            break
+                    break
+
+    m = _HRS_PATTERN.search(raw)
+    return m.group(0) if m else ""
+
+
+def extract_bdi_prediction(output_obj) -> str:
+    """
+    Pull the raw generated string out of whatever the pipeline returns,
+    then find the first BDI severity category label:
+      Minimal, Mild, Moderate, or Severe (case-insensitive).
+    Returns the canonical capitalised label (e.g. 'Moderate') or '' if nothing matched.
+    """
+    raw = _raw_text(output_obj)
+    if isinstance(output_obj, list):
+        for item in reversed(output_obj):
+            if isinstance(item, dict):
+                content = item.get("generated_text", "")
+                if isinstance(content, list):
+                    for turn in reversed(content):
+                        if isinstance(turn, dict) and turn.get("role") == "assistant":
+                            raw = _stringify_content(turn.get("content", ""))
+                            break
+                    break
+
+    m = _BDI_PATTERN.search(raw)
+    return _BDI_CANONICAL[m.group(0).lower()] if m else ""
+
+
+def _raw_text(output_obj) -> str:
+    if isinstance(output_obj, str):
+        return output_obj.strip()
+    if isinstance(output_obj, list) and output_obj:
+        first = output_obj[0]
+        if isinstance(first, dict):
+            for k in ["generated_text", "text", "answer", "content"]:
+                if k in first:
+                    val = first[k]
+                    if isinstance(val, str):
+                        return val.strip()
+                    if isinstance(val, list):
+                        return _stringify_content(val)
+    if isinstance(output_obj, dict):
+        for k in ["generated_text", "text", "answer", "content"]:
+            if k in output_obj and isinstance(output_obj[k], str):
+                return output_obj[k].strip()
+    return str(output_obj).strip()
+
+
+def _stringify_content(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for c in content:
+            if isinstance(c, dict):
+                parts.append(c.get("text", ""))
+            else:
+                parts.append(str(c))
+        return " ".join(parts)
+    return str(content)
+
+
+# ── Metrics ───────────────────────────────────────────────────────────────────
+
+VALID_HRS = {"0", "-1", "-2", "-3"}
+
+
+def compute_metrics(results: list[dict]) -> dict:
+    """
+    Given a list of result dicts (each with 'gold_answer' and 'prediction_text'),
+    compute accuracy, per-class recall, and parse-failure rate.
+
+    Auto-detects mode from gold labels:
+      - If gold labels are in {0, -1, -2, -3}  → HRS mode
+      - If gold labels are in {Minimal, Mild, Moderate, Severe} → BDI mode
+    """
+    total = len(results)
+    if total == 0:
+        return {}
+
+    # Detect mode from the first non-empty gold label
+    sample_gold = str(results[0]["gold_answer"]).strip()
+    mode = "bdi" if sample_gold in VALID_BDI else "hrs"
+    valid_labels = VALID_BDI if mode == "bdi" else VALID_HRS
+
+    exact, normalized, parse_fail = 0, 0, 0
+    per_class = {k: {"tp": 0, "support": 0} for k in valid_labels}
+
+    for r in results:
+        gold = str(r["gold_answer"]).strip()
+        pred = str(r["prediction_text"]).strip()
+
+        if pred not in valid_labels:
+            parse_fail += 1
+
+        if pred == gold:
+            exact += 1
+        if normalize_text(pred) == normalize_text(gold):
+            normalized += 1
+
+        if gold in per_class:
+            per_class[gold]["support"] += 1
+            if pred == gold:
+                per_class[gold]["tp"] += 1
+
+    per_class_recall = {}
+    prefix = "recall_bdi" if mode == "bdi" else "recall_hrs"
+    for cls, counts in per_class.items():
+        sup = counts["support"]
+        key = f"{prefix}_{cls.lower().replace('-', 'neg')}"
+        per_class_recall[key] = round(counts["tp"] / sup, 4) if sup > 0 else None
+
+    return {
+        "mode":               mode,
+        "num_samples":        total,
+        "exact_match":        round(exact / total, 4),
+        "normalized_match":   round(normalized / total, 4),
+        "parse_failure_rate": round(parse_fail / total, 4),
+        **per_class_recall,
+    }
