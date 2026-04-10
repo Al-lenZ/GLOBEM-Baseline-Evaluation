@@ -1,0 +1,15 @@
+{
+  "model_name": "google/gemma-4-E4B-it",
+  "model_slug": "gemma4_backbone",
+  "system_prompt_id": "you_are_a_clinical_decision_support_assistant_specializing_in_be",
+  "system_prompt_text": "You are a clinical decision support assistant specializing in behavioral health risk assessment. You will be given longitudinal behavioral data collected from mobile sensing (screen usage, sleep patterns, social proximity) for a patient. Your task is to predict the patient's Harbor Risk Score (HRS) for the assessment week. Respond with only a single integer: 0, -1, -2, or -3. Do not explain your reasoning.",
+  "created_at": "2026-04-08T16:30:59.473853",
+  "num_samples": 5391,
+  "exact_match": 0.2317,
+  "normalized_match": 0.2317,
+  "parse_failure_rate": 0.0,
+  "recall_hrs_-2": 0.5365,
+  "recall_hrs_-1": 0.5045,
+  "recall_hrs_0": 0.0248,
+  "recall_hrs_-3": 0.0841
+}

@@ -8,4 +8,4 @@ venv/
 
 # Ignore specific subfolders
 data/
-results/
+results/**/*.csv

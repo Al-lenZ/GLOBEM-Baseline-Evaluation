@@ -1,0 +1,16 @@
+{
+  "model_name": "google/medgemma-4b-it",
+  "model_slug": "medgemma15",
+  "system_prompt_id": "you_are_a_clinical_decision_support_assistant_specializing_in_be",
+  "system_prompt_text": "You are a clinical decision support assistant specializing in behavioral health risk assessment. You will be given longitudinal behavioral data collected from mobile sensing (screen usage, sleep patterns, social proximity) for a patient, along with their Beck Depression Inventory (BDI) score at study enrollment. Your task is to predict the patient's depression severity category after the 8-week observation period. Respond with only one of the following labels: Minimal, Mild, Moderate, or Severe. Do not explain your reasoning.",
+  "created_at": "2026-04-10T02:29:43.252702",
+  "mode": "bdi",
+  "num_samples": 505,
+  "exact_match": 0.4574,
+  "normalized_match": 0.4574,
+  "parse_failure_rate": 0.0,
+  "recall_bdi_severe": 0.6296,
+  "recall_bdi_moderate": 0.9221,
+  "recall_bdi_minimal": 0.215,
+  "recall_bdi_mild": 0.8191
+}
