@@ -15,7 +15,8 @@
   "models": {
     "gemma3":          "google/gemma-3-4b-it",
     "medgemma15":      "google/medgemma-4b-it",
-    "gemma4_backbone": "google/gemma-4-E4B-it"
+    "gemma4_backbone": "google/gemma-4-E4B-it",
+    "qwen3_8b":        "Qwen/Qwen3-8B"
   },
   "_notes": {
     "image_col": "image_path_or_url column is kept for schema compatibility but is empty; all notebooks skip image input and run text-only.",
